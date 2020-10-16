@@ -1,0 +1,319 @@
+# import libraries
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import random
+import time
+
+# TensorFlow and tf.keras
+import tensorflow as tf
+from tensorflow import keras
+
+np.random.seed(2)
+
+
+# import dataset
+
+dataset = pd.read_csv('creditcard.csv')
+
+## Prepocessing 
+from sklearn.preprocessing import StandardScaler
+
+# Create a new copy
+dataset2 = dataset
+# Normalizace the Amount between -1,1
+dataset2['normalizedAmount'] = StandardScaler().fit_transform(dataset2['Amount'].values.reshape(-1,1))
+
+dataset2 = dataset2.drop(columns = ['Amount','Time'])
+
+## Define the training data and the responde variable from the dataset
+y = dataset2['Class']
+X = dataset2.drop(columns = ['Class'])
+
+
+# Generate the Split train/test datasets
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state=0)
+
+# convert split sets to arrays
+X_train = np.array(X_train)
+X_test = np.array(X_test)
+y_train = np.array(y_train)
+y_test = np.array(y_test)
+
+
+
+### Deep Neural Network
+
+# import keras layers, optimizer & callbacks
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout
+
+# Create DNN model
+dnn_model = Sequential()
+
+# First stage of Dense layers
+dnn_model.add(Dense(units=16, input_dim=29,activation='relu'))
+dnn_model.add(Dense(units=24, activation='relu'))
+
+# Dropout to avoid oferfitting
+dnn_model.add(Dropout(rate=0.4))
+
+# Second stage of Dense layers
+dnn_model.add(Dense(units=20,activation='relu'))
+dnn_model.add(Dense(units=24,activation='relu'))
+# Last layer with sigmoid activation. Binary decision
+dnn_model.add(Dense(units=1,activation='sigmoid'))
+
+#Summary the model
+dnn_model.summary()
+
+
+### Training ###
+
+# Define the compile trainning params
+dnn_model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy'])
+
+# train the model
+dnn_model.fit(X_train, 
+              y_train, 
+              batch_size= 15,
+              epochs = 5)
+
+## DNN model evaluation
+score = dnn_model.evaluate(X_test,y_test)
+
+
+# Print eval result 
+print(score)
+
+## Metrics -->
+
+# Accuracy: (TRUE Positives + TRUE Negatives) / Total
+# Precision: TRUE Positives / (TRUE Positives + FALSE Positives)
+# Specificity: TRUE Negatives / (FALSE Positives + TRUE Negatives)
+# Recall: TRUE Positives / (TRUE Positives + FALSE Negatives)
+# F1-score:
+
+# Getting the prediction from the test dataset
+y_pred = dnn_model.predict(X_test).round()
+# convert array to dataframe
+y_test = pd.DataFrame(y_test)
+
+
+
+# Evaluate the quality of the model
+from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, precision_score, recall_score
+
+cnf_matrix = confusion_matrix(y_test, y_pred)
+
+# Accuracy score
+acc = accuracy_score(y_test, y_pred)
+
+# precision score (When is 0 and should be 1 and the other way round)
+pre = precision_score(y_test, y_pred)
+
+# recall score
+rec = recall_score(y_test, y_pred)
+
+f1 = f1_score(y_test, y_pred)
+
+
+# Metrics
+results = pd.DataFrame([['Deep Neural Network', acc, pre, rec, f1]],
+              columns = ['Model','Accuracy','Precision','Recall','F1 score'])
+
+results
+
+# Plot the confussion Matrix
+
+class_names=[0,1] # name  of classes
+fig, ax = plt.subplots()
+tick_marks = np.arange(len(class_names))
+plt.xticks(tick_marks, class_names)
+plt.yticks(tick_marks, class_names)
+
+# create heatmap
+sns.heatmap(pd.DataFrame(cnf_matrix), annot=True, cmap="YlGnBu" ,fmt='g')
+ax.xaxis.set_label_position("top")
+plt.tight_layout()
+plt.title('Confusion matrix', y=1.1)
+plt.ylabel('Actual label')
+plt.xlabel('Predicted label')
+print("Accuracy %0.4f" % accuracy_score(y_test, y_pred))
+
+## Round 2: Random Forest Classification
+from sklearn.ensemble import RandomForestClassifier
+
+# set parameters of RF and Fit
+random_forest = RandomForestClassifier(n_estimators = 100)
+
+classifier = RandomForestClassifier(random_state=0, n_estimators = 100,
+                                   criterion = 'entropy')
+classifier.fit(X_train, y_train)
+
+
+# Evaluating Test set
+y_pred = classifier.predict(X_test)
+
+# Calculation of metrics
+
+# Accuracy score
+acc = accuracy_score(y_test, y_pred)
+
+# precision score (When is 0 and should be 1 and the other way round)
+pre = precision_score(y_test, y_pred)
+
+# recall score
+rec = recall_score(y_test, y_pred)
+
+f1 = f1_score(y_test, y_pred)
+
+
+# Metrics 
+rf_results = pd.DataFrame([['Random Forest (n=100, GSx2 + Entropy)', acc, pre, rec, f1]],
+              columns = ['Model','Accuracy','Precision','Recall','F1 score'])
+
+# Showing the comparizon between the Models
+
+results = results.append(rf_results, ignore_index = True)
+
+results
+
+
+## Round 3: Decision Tree
+from sklearn.tree import DecisionTreeClassifier
+
+# set parameters of DecisionTree and Fit
+classifier = DecisionTreeClassifier()
+classifier.fit(X_train, y_train)
+
+
+# Evaluating Test set
+y_pred = classifier.predict(X_test)
+
+# Calculation of metrics
+
+# Accuracy score
+acc = accuracy_score(y_test, y_pred)
+
+# precision score (When is 0 and should be 1 and the other way round)
+pre = precision_score(y_test, y_pred)
+
+# recall score
+rec = recall_score(y_test, y_pred)
+
+f1 = f1_score(y_test, y_pred)
+
+# Metrics 
+dt_results = pd.DataFrame([['Decision Trees', acc, pre, rec, f1]],
+              columns = ['Model','Accuracy','Precision','Recall','F1 score'])
+
+# Showing the comparizon between the Models
+
+results = results.append(dt_results, ignore_index = True)
+
+results
+
+
+# Round 4: BALANCING THE DATASET
+
+# Splitting into train and Test set
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(X,
+                                                   y,
+                                                   test_size = 0.3,
+                                                   random_state = 0)
+
+
+# Round 4 
+
+#BALANCING THE DATASET:
+
+# # To Avoid the skewed on the total 
+
+# Counting and watching the Y_train distribution 
+y_train.value_counts()
+
+
+# The expecting distribution to avoid a Bias is to have a 50/50 (0/1)
+#This balancing ensure that the model is accuracy
+
+#pos and neg index values
+pos_index = y_train[y_train.values == 1].index
+neg_index = y_train[y_train.values == 0].index
+
+if len(pos_index) > len(neg_index):
+    higher = pos_index
+    lower = neg_index
+else:
+    lower = pos_index
+    higher = neg_index
+    
+#Create random index selection
+random.seed(0)
+# random select index record up to the same size of lower index
+higher = np.random.choice(higher, size = len(lower))
+# select the lower index and convert to a numpy array
+lower = np.asarray(lower)
+# create the new index as a combination 
+new_indexes = np.concatenate((lower,higher))
+
+# Reselect the X_train, y_train dataset using the new indexes
+X_train = X_train.loc[new_indexes, ]
+y_train = y_train[new_indexes]
+
+
+y_train.value_counts()
+
+
+
+# train the DNN model 
+dnn_model.fit(X_train, 
+              y_train, 
+              batch_size= 15,
+              epochs = 5)
+
+
+
+## DNN model evaluation
+score = dnn_model.evaluate(X_test,y_test)
+
+
+# Print eval result 
+print(score)
+
+
+# Getting the prediction from the test dataset
+y_pred = dnn_model.predict(X_test).round()
+# convert array to dataframe
+y_test = pd.DataFrame(y_test)
+
+# Evaluating Test set
+y_pred = classifier.predict(X_test)
+
+
+# Calculation of metrics
+
+# Accuracy score
+acc = accuracy_score(y_test, y_pred)
+
+# precision score (When is 0 and should be 1 and the other way round)
+pre = precision_score(y_test, y_pred)
+
+# recall score
+rec = recall_score(y_test, y_pred)
+
+f1 = f1_score(y_test, y_pred)
+
+# Metrics 
+dnn_results = pd.DataFrame([['Deep Neural Network (Undersampling & balanced)', acc, pre, rec, f1]],
+              columns = ['Model','Accuracy','Precision','Recall','F1 score'])
+
+# Showing the comparizon between the Models
+
+results = results.append(dnn_results, ignore_index = True)
+
+results
